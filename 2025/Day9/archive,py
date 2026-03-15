@@ -1,0 +1,130 @@
+from pathlib import Path
+DIR = Path(__file__).parent 
+
+import itertools
+from itertools import groupby
+
+MAX = 100
+coords = []
+sorted_by_x = []
+sorted_by_y = []
+
+def compute_area(i:int, j:int) -> int:
+    x1, y1 = coords[i]
+    x2, y2 = coords[j]
+    return (abs(x1-x2)+1) * (abs(y1-y2)+1)
+
+def find_pareto(i:int, which:str) -> list:
+    x_idx = next((k for k, sublist in enumerate(sorted_by_x) if i in sublist), None)
+    y_idx = next((k for k, sublist in enumerate(sorted_by_y) if i in sublist), None)
+    bottom_half = list(itertools.chain.from_iterable(sorted_by_y[y_idx:]))
+    if which == 'right':
+        right_half = list(itertools.chain.from_iterable(sorted_by_x[x_idx:]))
+        candidates = list(set(right_half) & set(bottom_half))
+    else:
+        left_half = list(itertools.chain.from_iterable(sorted_by_x[:x_idx+1]))
+        candidates = list(set(left_half) & set(bottom_half))
+    candidates.remove(i)
+    pareto = []
+    if len(candidates) == 0:
+        return pareto 
+    groups = [
+        [idx for idx in group if idx in candidates]
+        for group in sorted_by_x
+    ]
+    groups = [group for group in groups if group]
+    if which == 'left':
+        groups = groups[::-1]
+    y_min = MAX 
+    for group in groups:
+        x, y = coords[group[0]]
+        if y < y_min:
+            pareto.append(group[0])
+            y_min = y 
+    return pareto 
+
+def right_search(i:int, dp_right:list) -> int:
+    if dp_right[i] >= 0:
+        return dp_right[i]
+    pareto = find_pareto(i, 'right')
+    if i==309:
+        print(pareto)
+    if not pareto:
+        dp_right[i] = i 
+        return i 
+    max_area = 0 
+    best_idx = i 
+    for j in pareto:
+        paretoBest = right_search(j, dp_right)
+        if i==309:
+            print(paretoBest)
+        area = compute_area(i, paretoBest)
+        if area > max_area:
+            max_area = area
+            best_idx = paretoBest 
+    dp_right[i] = best_idx 
+    return best_idx 
+
+def left_search(i:int, dp_left:list) -> int:
+    if dp_left[i] >= 0:
+        return dp_left[i]
+    pareto = find_pareto(i, 'left')
+    if not pareto:
+        dp_left[i] = i 
+        return i 
+    max_area = 0 
+    best_idx = i
+    for j in pareto:
+        paretoBest = left_search(j, dp_left)
+        area = compute_area(i, paretoBest)
+        if area > max_area:
+            max_area = area
+            best_idx = paretoBest 
+    dp_left[i] = best_idx 
+    return best_idx 
+
+def search() -> int:
+    bestArea = 0
+    N = len(coords)
+    dp_left = [-1] * N 
+    dp_right = [-1] * N
+    bestArea = 0
+    for i in range(N):
+        leftBest = left_search(i, dp_left)
+        leftArea = compute_area(leftBest, i)
+        rightBest = right_search(i, dp_right)
+        rightArea = compute_area(rightBest, i)
+        area = max(leftArea, rightArea)
+        if area > bestArea:
+            bestArea = area
+    return bestArea 
+
+def parse_input(input:str) -> int:
+    global coords, x_max, max_height, sorted_by_x, sorted_by_y, MAX
+    coords = input.split('\n') # ["189,275", ...]
+    coords = [w.split(',') for w in coords] # [['189', '275'], ...]
+    coords = [[int(w) for w in u] for u in coords]
+    # Sort by x
+    indexed_coords = list(enumerate(coords))
+    indexed_coords.sort(key=lambda item: (item[1][0], item[1][1]))
+    sorted_by_x = []
+    for x_val, group in groupby(indexed_coords, key=lambda item: item[1][0]):
+        indices = [item[0] for item in group]
+        sorted_by_x.append(indices)
+    # Sort by y
+    indexed_coords.sort(key=lambda item: (item[1][1], item[1][0]))
+    sorted_by_y = []
+    for y_val, group in groupby(indexed_coords, key=lambda item: item[1][1]):
+        indices = [item[0] for item in group]
+        sorted_by_y.append(indices)
+    MAX = coords[sorted_by_y[-1][0]][1] + 1
+    return search() 
+
+def main():
+    with open(DIR/"document.txt", 'r') as f:
+        input = f.read()
+    ans = parse_input(input)
+    print("Final answer = ", ans)
+
+if __name__ == '__main__':
+    main() 
